@@ -3,6 +3,7 @@ package translator
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"path"
 	"path/filepath"
@@ -12,20 +13,25 @@ import (
 	"github.com/tidwall/gjson"
 )
 
-type JsonDriver struct {
+// JSONDriver json driver
+type JSONDriver struct {
 	fallback string
 	dir      string
 	jsonData string
+	data     map[string]string
 }
 
-func (t *JsonDriver) init(fallbackLocale string, dir string) error {
+func (t *JSONDriver) init(fallbackLocale string, dir string) error {
+	if t.data == nil {
+		t.data = make(map[string]string)
+	}
 	t.fallback = fallbackLocale
 	t.dir = dir
 	return t.Load()
 }
 
 // Load load translations file to memory
-func (t *JsonDriver) Load() error {
+func (t *JSONDriver) Load() error {
 	var resolveFiles = func(dir string) (map[string]string, error) {
 		dir = filepath.Dir(path.Join(dir, "some.txt"))
 		res := make(map[string]string)
@@ -120,14 +126,17 @@ func (t *JsonDriver) Load() error {
 // Use placeholder in message for field name
 // @example:
 // t.Register("en", "welcome", "Hello {name}, welcome!")
-func (t *JsonDriver) Register(locale string, key string, message string) {
-	// Do nothing
-	// Json driver not support register
+func (t *JSONDriver) Register(locale string, key string, message string) {
+	t.data[fmt.Sprintf("[%s].%s", locale, key)] = message
 }
 
 // Resolve find translation for locale
 // if no translation found for locale return fallback translation or nil
-func (t *JsonDriver) Resolve(locale string, key string) string {
+func (t *JSONDriver) Resolve(locale string, key string) string {
+	if m, ok := t.data[fmt.Sprintf("[%s].%s", locale, key)]; ok {
+		return m
+	}
+
 	value := gjson.Get(t.jsonData, locale+"."+key)
 	if !value.Exists() {
 		value = gjson.Get(t.jsonData, t.fallback+"."+key)
@@ -137,7 +146,7 @@ func (t *JsonDriver) Resolve(locale string, key string) string {
 
 // ResolveStruct find translation from translatable
 // if empty string returned from translatable or struct not translatable, default translation will resolved
-func (t *JsonDriver) ResolveStruct(s interface{}, locale string, key string) string {
+func (t *JSONDriver) ResolveStruct(s interface{}, locale string, key string) string {
 	if tr := resolveTranslatable(s); tr != nil {
 		tr := tr.GetTranslation(locale, key)
 		if tr != "" {
@@ -150,7 +159,7 @@ func (t *JsonDriver) ResolveStruct(s interface{}, locale string, key string) str
 // Translate get translation for locale
 // @example:
 // t.Translate("en", "welcome", map[string]string{ "name": "John" })
-func (t *JsonDriver) Translate(locale string, key string, placeholders map[string]string) string {
+func (t *JSONDriver) Translate(locale string, key string, placeholders map[string]string) string {
 	message := t.Resolve(locale, key)
 	for p, v := range placeholders {
 		message = strings.ReplaceAll(message, "{"+p+"}", v)
@@ -161,7 +170,7 @@ func (t *JsonDriver) Translate(locale string, key string, placeholders map[strin
 // TranslateStruct translate using translatable interface
 // if empty string returned from translatable or struct not translatable, default translation will resolved
 // Caution: use non-pointer implemantation for struct
-func (t *JsonDriver) TranslateStruct(s interface{}, locale string, key string, placeholders map[string]string) string {
+func (t *JSONDriver) TranslateStruct(s interface{}, locale string, key string, placeholders map[string]string) string {
 	message := t.ResolveStruct(s, locale, key)
 	for p, v := range placeholders {
 		message = strings.ReplaceAll(message, "{"+p+"}", v)

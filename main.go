@@ -7,9 +7,9 @@ func NewMemoryTranslator(fallbackLocale string) Translator {
 	return t
 }
 
-// NewJsonTranslator create a new memory based translator
-func NewJsonTranslator(fallbackLocale string, dir string) (Translator, error) {
-	t := new(JsonDriver)
+// NewJSONTranslator create a new memory based translator
+func NewJSONTranslator(fallbackLocale string, dir string) (Translator, error) {
+	t := new(JSONDriver)
 	if err := t.init(fallbackLocale, dir); err != nil {
 		return nil, err
 	}
